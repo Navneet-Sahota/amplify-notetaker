@@ -4,7 +4,7 @@ import { withAuthenticator } from "aws-amplify-react";
 
 import { createNote, updateNote, deleteNote } from "./graphql/mutations";
 import { listNotes } from "./graphql/queries";
-import { onCreateNote } from "./graphql/subscriptions";
+import { onCreateNote, onDeleteNote } from "./graphql/subscriptions";
 
 function App() {
   const [id, setId] = useState("");
@@ -25,9 +25,19 @@ function App() {
       },
     });
     getListNotes();
+    const deleteNoteListener = API.graphql(
+      graphqlOperation(onDeleteNote)
+    ).subscribe({
+      next: noteData => {
+        const deletedNoteId = noteData.value.data.onDeleteNote.id;
+        const updatedNotes = notes.filter(item => item.id !== deletedNoteId);
+        setNotes(updatedNotes);
+      },
+    });
 
     return () => {
       createNoteListener.unsubscribe();
+      deleteNoteListener.unsubscribe();
     };
   }, [notes]);
 
@@ -68,12 +78,7 @@ function App() {
   };
 
   const handleDeleteNote = async id => {
-    const result = await API.graphql(
-      graphqlOperation(deleteNote, { input: { id } })
-    );
-    const deletedNoteId = result.data.deleteNote.id;
-    const updatedNotes = notes.filter(item => item.id !== deletedNoteId);
-    setNotes(updatedNotes);
+    return API.graphql(graphqlOperation(deleteNote, { input: { id } }));
   };
 
   const handleSetNote = ({ id, note }) => {
