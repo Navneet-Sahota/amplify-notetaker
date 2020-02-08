@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import { API, graphqlOperation } from "aws-amplify";
 import { withAuthenticator } from "aws-amplify-react";
 
-import { createNote, deleteNote } from "./graphql/mutations";
+import { createNote, updateNote, deleteNote } from "./graphql/mutations";
 import { listNotes } from "./graphql/queries";
 
 function App() {
+  const [id, setId] = useState("");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState([]);
 
@@ -21,14 +22,40 @@ function App() {
     setNote(event.target.value);
   };
 
+  const hasExistingNote = () => {
+    if (id) {
+      return notes.findIndex(item => item.id === id) > -1 ? true : false;
+    }
+    return false;
+  };
+
   const handleAddNote = async event => {
     event.preventDefault();
     const result = await API.graphql(
       graphqlOperation(createNote, { input: { note } })
     );
-    const newNote = result.data.createNote;
-    setNotes([newNote, ...notes]);
+    if (hasExistingNote()) {
+      handleUpdateNote();
+    } else {
+      const newNote = result.data.createNote;
+      setNotes([newNote, ...notes]);
+      setNote("");
+    }
+  };
+
+  const handleUpdateNote = async () => {
+    const result = await API.graphql(
+      graphqlOperation(updateNote, { input: { id, note } })
+    );
+    const updatedNote = result.data.updateNote;
+    const index = notes.findIndex(item => item.id === updatedNote.id);
+    setNotes([
+      ...notes.slice(0, index),
+      updatedNote,
+      ...notes.slice(index + 1),
+    ]);
     setNote("");
+    setId("");
   };
 
   const handleDeleteNote = async id => {
@@ -38,6 +65,11 @@ function App() {
     const deletedNoteId = result.data.deleteNote.id;
     const updatedNotes = notes.filter(item => item.id !== deletedNoteId);
     setNotes(updatedNotes);
+  };
+
+  const handleSetNote = ({ id, note }) => {
+    setNote(note);
+    setId(id);
   };
 
   return (
@@ -52,13 +84,15 @@ function App() {
           value={note}
         />
         <button className="pa2 f4" type="submit">
-          Add note
+          {id ? "Update note" : "Add note"}
         </button>
       </form>
       <div>
         {notes.map(item => (
           <div key={item.id} className="flex items-center">
-            <li className="list pa1 f3">{item.note}</li>
+            <li onClick={() => handleSetNote(item)} className="list pa1 f3">
+              {item.note}
+            </li>
             <button
               onClick={() => handleDeleteNote(item.id)}
               style={{ cursor: "pointer" }}
