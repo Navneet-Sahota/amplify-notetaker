@@ -4,6 +4,7 @@ import { withAuthenticator } from "aws-amplify-react";
 
 import { createNote, updateNote, deleteNote } from "./graphql/mutations";
 import { listNotes } from "./graphql/queries";
+import { onCreateNote } from "./graphql/subscriptions";
 
 function App() {
   const [id, setId] = useState("");
@@ -15,8 +16,20 @@ function App() {
       const result = await API.graphql(graphqlOperation(listNotes));
       setNotes(result.data.listNotes.items);
     };
+    const createNoteListener = API.graphql(
+      graphqlOperation(onCreateNote)
+    ).subscribe({
+      next: noteData => {
+        const newNote = noteData.value.data.onCreateNote;
+        setNotes([newNote, ...notes]);
+      },
+    });
     getListNotes();
-  }, []);
+
+    return () => {
+      createNoteListener.unsubscribe();
+    };
+  }, [notes]);
 
   const handleChangeNote = event => {
     setNote(event.target.value);
@@ -31,14 +44,10 @@ function App() {
 
   const handleAddNote = async event => {
     event.preventDefault();
-    const result = await API.graphql(
-      graphqlOperation(createNote, { input: { note } })
-    );
+    await API.graphql(graphqlOperation(createNote, { input: { note } }));
     if (hasExistingNote()) {
       handleUpdateNote();
     } else {
-      const newNote = result.data.createNote;
-      setNotes([newNote, ...notes]);
       setNote("");
     }
   };
