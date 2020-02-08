@@ -4,7 +4,11 @@ import { withAuthenticator } from "aws-amplify-react";
 
 import { createNote, updateNote, deleteNote } from "./graphql/mutations";
 import { listNotes } from "./graphql/queries";
-import { onCreateNote, onDeleteNote } from "./graphql/subscriptions";
+import {
+  onCreateNote,
+  onDeleteNote,
+  onUpdateNote,
+} from "./graphql/subscriptions";
 
 function App() {
   const [id, setId] = useState("");
@@ -34,10 +38,24 @@ function App() {
         setNotes(updatedNotes);
       },
     });
+    const updateNoteListener = API.graphql(
+      graphqlOperation(onUpdateNote)
+    ).subscribe({
+      next: noteData => {
+        const updatedNote = noteData.value.data.onUpdateNote;
+        const index = notes.findIndex(item => item.id === updatedNote.id);
+        setNotes([
+          ...notes.slice(0, index),
+          updatedNote,
+          ...notes.slice(index + 1),
+        ]);
+      },
+    });
 
     return () => {
       createNoteListener.unsubscribe();
       deleteNoteListener.unsubscribe();
+      updateNoteListener.unsubscribe();
     };
   }, [notes]);
 
@@ -54,25 +72,16 @@ function App() {
 
   const handleAddNote = async event => {
     event.preventDefault();
-    await API.graphql(graphqlOperation(createNote, { input: { note } }));
     if (hasExistingNote()) {
       handleUpdateNote();
     } else {
+      await API.graphql(graphqlOperation(createNote, { input: { note } }));
       setNote("");
     }
   };
 
   const handleUpdateNote = async () => {
-    const result = await API.graphql(
-      graphqlOperation(updateNote, { input: { id, note } })
-    );
-    const updatedNote = result.data.updateNote;
-    const index = notes.findIndex(item => item.id === updatedNote.id);
-    setNotes([
-      ...notes.slice(0, index),
-      updatedNote,
-      ...notes.slice(index + 1),
-    ]);
+    await API.graphql(graphqlOperation(updateNote, { input: { id, note } }));
     setNote("");
     setId("");
   };
